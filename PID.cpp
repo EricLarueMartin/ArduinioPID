@@ -1,100 +1,71 @@
 /**********************************************************************************************
  * Arduino PID Library
- * to make calculation easier the time units on Ki and Kd are in units of the sample time
+ * All time units are in sample period
  **********************************************************************************************/
-
-#if ARDUINO >= 100
-  #include "Arduino.h"
-#else
-  #include "WProgram.h"
-#endif
 
 #include <PID.h>
 
 //Constructor
 
-PID::PID(double* iInput, double* iOutput, double* iSetpoint,
+PID::PID(double* iInput, double* iOutput, double* iSetPoint,
         double iKp, double iKi, double iKd)
 {
-
-    Output = iOutput;
-    Input = iInput;
-    Setpoint = iSetpoint;
+    output = iOutput;
+    input = iInput;
+    setPoint = iSetPoint;
     Kp=iKp;
     Ki=iKi;
     Kd=iKd;
-	inAuto = false;
-    outMin = 0;
-    outMax = 1;
-    SampleTime = 1000;							//default Controller Sample Time is 0.1 seconds
-    lastInput = *Input;
+    inAuto = false;
     lastTime = millis();
+    lastSample = *input;
+    pTerm = Kp*(*setPoint - sampleTotal); // positive indicates output should go up
 }
 
 
 /* Compute() **********************************************************************
- *     This function should be called
- *   every time "void loop()" executes.  the function will decide for itself whether a new
- *   pid Output needs to be computed.  returns true when the output is computed,
- *   false when nothing has been done.
+    This function should be called every time "void loop()" executes.
+    The function will decide for itself whether a new output needs to be computed.
+    Returns true when the output is computed, false when output hasn't changed.
  **********************************************************************************/
 bool PID::Compute()
 {
-   if(!inAuto) return false;
-   unsigned long now = millis();
-   unsigned long timeChange = (now - lastTime);
-   if(timeChange>=SampleTime)
-   {
-      /*Compute all the working error variables*/
-      double error = *Setpoint - *Input;
-      ITerm+= (Ki * error);
-      double dTerm = (*Input - lastInput);
-
-//      if(ITerm > outMax) ITerm= outMax;
-//      else if(ITerm < outMin) ITerm= outMin;
+    sampleTotal+=*input;
+    ++sampleCount;
+    // check the time
+    unsigned long now = millis();
+    unsigned long timeChange = (now - lastTime);
+    if(timeChange>=sampleTime) // it it time for an update?
+    {
+      sampleTotal/=sampleCount; // average the samples in the current sample period
+      double pTerm = *setPoint - sampleTotal; // positive indicates output should go up
+      iTerm += (Ki * pTerm); // use different to add to iTerm before applying Kp
+      pTerm *= Kp; // apply Kp
+      double dTerm = Kd*(lastSample - sampleTotal); // positive indicates output should go up
       /*Compute PID Output*/
-      *Output = Kp * error + ITerm - Kd * dTerm;
+      *output = pTerm + iTerm + dTerm;
 
-	  if(*Output > outMax) {
-            *Output = outMax;
-            if (Ki<1e-9) ITerm = 0;
-            else ITerm = *Output + Kd * dTerm - Kp * error;
-	  }
-      else if(*Output < outMin) {
-            *Output = outMin;
-            if (Ki<1e-9) ITerm = 0;
-            else ITerm = *Output + Kd * dTerm - Kp * error;
+	  if(*output > outMax) {
+            // limit output
+            *output = outMax;
+            iTerm = outMax - pTerm - dTerm; // Calculate iTerm to produce maximum
+      }
+      else if(*output < outMin) {
+            // limit output
+            *output = outMin;
+            iTerm = outMin - pTerm - dTerm; // Calculate iTerm to produce minimum
       }
 
-      /*Remember some variables for next time*/
-      lastInput = *Input;
+      // save last sample period
       lastTime = now;
-	  return true;
+      lastSample = sampleTotal;
+      // initialize new sample period
+    sampleTotal=0.0;
+    sampleCount=0;
+    return true; // The output was recalculated, so return true
    }
-   else return false;
-}
-
-/* SetMode(...)****************************************************************
- * Allows the controller Mode to be set to manual (0) or Automatic (non-zero)
- * when the transition from manual to auto occurs, the controller is
- * automatically initialized
- ******************************************************************************/
-void PID::SetMode(bool Mode)
-{
-    inAuto = Mode;
-    if(inAuto)
-        PID::Initialize();
-}
-
-/* Initialize()****************************************************************
- *	does all the things that need to happen to ensure a seamless transition
- *  from manual to automatic mode.
- ******************************************************************************/
-void PID::Initialize()
-{
-    ITerm = *Output + Kp * (*Setpoint - *Input); // set history such that calculated power is current power
-    lastInput = *Input;
-    lastTime = millis();
+   else //     if(timeChange>=SampleTime)
+        return false; // Output wasn't recalculated, so return false
 }
 
 /* SetOuput()****************************************************************
@@ -102,16 +73,7 @@ void PID::Initialize()
  ******************************************************************************/
 void PID::SetOutput(double val)
 {
-    *Output = val;
-    ITerm = *Output + Kp * (*Setpoint - *Input); // set history such that calculated power is current power
-}
-
-
-/* Status Functions*************************************************************
- ******************************************************************************/
-
-bool PID::GetMode()
-{
-    return (inAuto);
+    *output = val;
+    iTerm = val - pTerm - dTerm; // Calculate iTerm to produce val
 }
 
