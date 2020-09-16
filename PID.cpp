@@ -7,7 +7,7 @@
 
 //Constructor
 
-PID::PID(double* iInput, double* iOutput, double* iSetPoint,
+PID::PID(double* iInput, double* iOutput, double iSetPoint,
          double iKp, double iKi, double iKd)
 {
     output = iOutput;
@@ -19,7 +19,7 @@ PID::PID(double* iInput, double* iOutput, double* iSetPoint,
     inAuto = false;
     lastTime = millis();
     lastSample = *input;
-    pTerm = Kp*(*setPoint - sampleTotal); // positive indicates output should go up
+    pTerm = Kp*(setPoint - sampleTotal); // positive indicates output should go up
 }
 
 
@@ -38,7 +38,7 @@ bool PID::Compute()
     if(timeChange>=sampleTime) // it it time for an update?
     {
         sampleTotal/=sampleCount; // average the samples in the current sample period
-        double pTerm = *setPoint - sampleTotal; // positive indicates output should go up
+        double pTerm = setPoint - sampleTotal; // positive indicates output should go up
         iTerm += (Ki * pTerm); // use different to add to iTerm before applying Kp
         pTerm *= Kp; // apply Kp
         double dTerm = Kd*(lastSample - sampleTotal); // positive indicates output should go up

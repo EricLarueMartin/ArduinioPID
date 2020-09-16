@@ -15,7 +15,7 @@ class PID
 public:
 
     //commonly used functions **************************************************************************
-    PID(double*, double*, double*,        // * constructor.  links the PID to the Input, Output, and
+    PID(double*, double*, double,        // * constructor.  links the PID to the Input, Output, and
         double, double, double);     //   SetPoint.  Initial tuning parameters are also set here
 
     double Kp;                  // * (P)roportional Tuning Parameter
@@ -24,7 +24,7 @@ public:
 
     double *input;              // * Pointers to the input, output, and setPoint variables
     double *output;
-    double *setPoint;
+    double setPoint;
 
     unsigned long sampleTime = 10;   // Minimum time between samples for history, all samples shorter than this will be averaged
     unsigned sampleCount = 0; // Number of samples taken this period
