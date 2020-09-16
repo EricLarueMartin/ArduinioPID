@@ -8,7 +8,7 @@
 //Constructor
 
 PID::PID(double* iInput, double* iOutput, double* iSetPoint,
-        double iKp, double iKi, double iKd)
+         double iKp, double iKi, double iKd)
 {
     output = iOutput;
     input = iInput;
@@ -37,34 +37,43 @@ bool PID::Compute()
     unsigned long timeChange = (now - lastTime);
     if(timeChange>=sampleTime) // it it time for an update?
     {
-      sampleTotal/=sampleCount; // average the samples in the current sample period
-      double pTerm = *setPoint - sampleTotal; // positive indicates output should go up
-      iTerm += (Ki * pTerm); // use different to add to iTerm before applying Kp
-      pTerm *= Kp; // apply Kp
-      double dTerm = Kd*(lastSample - sampleTotal); // positive indicates output should go up
-      /*Compute PID Output*/
-      *output = pTerm + iTerm + dTerm;
+        sampleTotal/=sampleCount; // average the samples in the current sample period
+        double pTerm = *setPoint - sampleTotal; // positive indicates output should go up
+        iTerm += (Ki * pTerm); // use different to add to iTerm before applying Kp
+        pTerm *= Kp; // apply Kp
+        double dTerm = Kd*(lastSample - sampleTotal); // positive indicates output should go up
+        if (inAuto)
+        {
+            // Compute PID Output
+            *output = pTerm + iTerm + dTerm;
+            // check limits
+            if(*output > outMax)
+            {
+                // limit output
+                *output = outMax;
+                iTerm = outMax - pTerm - dTerm; // Calculate iTerm to produce maximum
+            }
+            else if(*output < outMin)
+            {
+                // limit output
+                *output = outMin;
+                iTerm = outMin - pTerm - dTerm; // Calculate iTerm to produce minimum
+            }
+        }
+        else // if (inAuto)
+            // if no in automatic control then adjust iTerm to what would produce current output
+            // this keeps output from jumping if switched back to auto
+            iTerm = *output - pTerm - dTerm;
 
-	  if(*output > outMax) {
-            // limit output
-            *output = outMax;
-            iTerm = outMax - pTerm - dTerm; // Calculate iTerm to produce maximum
-      }
-      else if(*output < outMin) {
-            // limit output
-            *output = outMin;
-            iTerm = outMin - pTerm - dTerm; // Calculate iTerm to produce minimum
-      }
-
-      // save last sample period
-      lastTime = now;
-      lastSample = sampleTotal;
-      // initialize new sample period
-    sampleTotal=0.0;
-    sampleCount=0;
-    return true; // The output was recalculated, so return true
-   }
-   else //     if(timeChange>=SampleTime)
+        // save last sample period
+        lastTime = now;
+        lastSample = sampleTotal;
+        // initialize new sample period
+        sampleTotal=0.0;
+        sampleCount=0;
+        return true; // The output was recalculated, so return true
+    }
+    else //     if(timeChange>=SampleTime)
         return false; // Output wasn't recalculated, so return false
 }
 
